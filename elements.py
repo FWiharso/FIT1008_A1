@@ -75,7 +75,12 @@ class EffectivenessCalculator:
         Water is double effective to Fire, and half effective to Water and Grass [2, 0.5, 0.5]
         Grass is half effective to Fire and Grass, and double effective to Water [0.5, 2, 0.5]
         """
-        raise NotImplementedError
+        self.element_names = element_names
+        self.effectiveness_values = effectiveness_values
+        """
+        The following method has a time complexity of O(n), where n is the number of elements.
+        In this case, it is not practical for an O(1) complexity to be achieved due to the nature of storing the given values.
+        """
 
     @classmethod
     def get_effectiveness(cls, type1: Element, type2: Element) -> float:
@@ -84,12 +89,16 @@ class EffectivenessCalculator:
 
         Example: EffectivenessCalculator.get_effectiveness(Element.FIRE, Element.WATER) == 0.5
         """
-        raise NotImplementedError
+        index1 = type1.value - 1
+        index2 = type2.value - 1
+        return cls.instance.effectiveness_values[index1 * len(cls.instance.element_names) + index2]
+        """
+        The method above has a best case and worst case complexity of O(1).
+        The complexity of the equations is always identical regardless of the values or number of elements.
+        """
 
     @classmethod
     def from_csv(cls, csv_file: str) -> EffectivenessCalculator:
-        # NOTE: This is a terrible way to open csv files, if writing your own code use the `csv` module.
-        # This is done this way to facilitate the second half of the task, the __init__ definition.
         with open(csv_file, "r") as file:
             header, rest = file.read().strip().split("\n", maxsplit=1)
             header = header.split(",")
@@ -107,7 +116,6 @@ class EffectivenessCalculator:
         cls.instance = EffectivenessCalculator.from_csv("type_effectiveness.csv")
 
 EffectivenessCalculator.make_singleton()
-
 
 if __name__ == "__main__":
     print(EffectivenessCalculator.get_effectiveness(Element.FIRE, Element.WATER))
