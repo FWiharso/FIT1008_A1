@@ -37,30 +37,94 @@ class MonsterTeam:
     TEAM_LIMIT = 6
 
     def __init__(self, team_mode: TeamMode, selection_mode, **kwargs) -> None:
-        # Add any preinit logic here.
+        """
+        Best case: O(n)
+        Worst case: O(n) - Dependent of the size of monsters in the team created
+        """
         self.team_mode = team_mode
+        self.team = ArrayR[Optional[MonsterBase]](self.TEAM_LIMIT)
+        self.team_size = 0
         if selection_mode == self.SelectionMode.RANDOM:
-            self.select_randomly(**kwargs)
+            self.select_randomly
         elif selection_mode == self.SelectionMode.MANUAL:
-            self.select_manually(**kwargs)
+            self.select_manually
         elif selection_mode == self.SelectionMode.PROVIDED:
             self.select_provided(**kwargs)
         else:
             raise ValueError(f"selection_mode {selection_mode} not supported.")
 
     def add_to_team(self, monster: MonsterBase):
-        raise NotImplementedError
+        """
+        Best case: O(1) - When the monster is inserted without any shifting.
+        Worst case: O(n) - When shifting is involved in insertion.
+        """
+        if self.team_size < self.TEAM_LIMIT:
+            if self.team_mode == self.TeamMode.FRONT:
+                self.team.insert_first(monster)
+            elif self.team_mode == self.TeamMode.BACK:
+                self.team.insert_last(monster)
+            elif self.team_mode == self.TeamMode.OPTIMISE:
+                stat_value = monster.get_stat(self.sort_key)
+                index = self.team_size
+                while index > 0 and self.team[index - 1].get_stat(self.sort_key) < stat_value:
+                    self.team[index] = self.team[index - 1]
+                    index -= 1
+                self.team[index] = monster
+            self.team_size += 1
+        else:
+            raise ValueError("Team is already full.")
 
     def retrieve_from_team(self) -> MonsterBase:
-        raise NotImplementedError
+        """
+        Best case: O(1)
+        Worst case: O(1) - Since there is a set of instructions based on every possible scenario
+        It directly accesses an element from the given array.
+        """
+        if self.team_size > 0:
+            if self.team_mode == self.TeamMode.FRONT:
+                monster = self.team.get_first()
+            elif self.team_mode == self.TeamMode.BACK:
+                monster = self.team.get_last()
+            elif self.team_mode == self.TeamMode.OPTIMISE:
+                monster = self.team[self.team_size - 1]
+            self.team_size -= 1
+            return monster
+        else:
+            raise ValueError("Team is empty.")
 
     def special(self) -> None:
-        raise NotImplementedError
+        """
+        Best case: O(n)
+        Worst case: O(n) - Where n is dependent on the team's size
+        O(n) is required due to the nature of operations performed and permuations involved.
+        """
+        if self.team_mode == self.TeamMode.FRONT:
+            self.team.reverse_first_n(3)
+        elif self.team_mode == self.TeamMode.BACK:
+            middle = self.team_size // 2
+            self.team.swap_first_half_with_second_half(middle)
+            self.team.reverse_last_n(middle)
+        elif self.team_mode == self.TeamMode.OPTIMISE:
+            self.team.reverse()
+        else:
+            raise ValueError("Invalid team mode.")
 
     def regenerate_team(self) -> None:
-        raise NotImplementedError
+        """
+        Best case: O(1)
+        Worst case: O(1) - Simply creates a new empty team
+        """
+        self.team = ArrayR[Optional[MonsterBase]](self.TEAM_LIMIT)
+        self.team_size = 0
 
     def select_randomly(self):
+        """
+        Best case: O(n)
+        Worst case: O(n)
+        In this case, it is not possible for the best case complexity to be O(1).
+        It is required for the algorithm to iterate through every element in the list.
+        This is in order to count the amount of spawnable monsters, resulting in O(n) complexity.
+        """
         team_size = RandomGen.randint(1, self.TEAM_LIMIT)
         monsters = get_all_monsters()
         n_spawnable = 0
@@ -82,6 +146,12 @@ class MonsterTeam:
                 raise ValueError("Spawning logic failed.")
 
     def select_manually(self):
+        """
+        Best case: O(n * k)
+        Worst case: O(n * k)
+        In this case, n is the team size, and k is the number of available monsters.
+        It is not possible to reduce time complexity due to iterating over all the possible monsters.
+        """
         """
         Prompt the user for input on selecting the team.
         Any invalid input should have the code prompt the user again.
@@ -186,9 +256,34 @@ class MonsterTeam:
         This monster cannot be spawned.
         Which monster are you spawning? 1
         """
-        raise NotImplementedError
+        team_size = int(input("How many monsters are there? "))
+        monsters = get_all_monsters()
+        spawnable_monsters = [monster for monster in monsters if monster.can_be_spawned()]
+
+        print("MONSTERS Are:")
+        for index, monster in enumerate(spawnable_monsters, start=1):
+            status = "✔️" if monster in spawnable_monsters else "❌"
+            print(f"{index}: {monster.get_name()} [{status}]")
+
+        for _ in range(team_size):
+            valid_selection = False
+            while not valid_selection:
+                try:
+                    monster_index = int(input("Which monster are you spawning? ")) - 1
+                    if 0 <= monster_index < len(spawnable_monsters):
+                        selected_monster = spawnable_monsters[monster_index]
+                        self.add_to_team(selected_monster())
+                        valid_selection = True
+                    else:
+                        print("Invalid selection. Please choose a valid monster.")
+                except ValueError:
+                    print("Invalid input. Please enter a valid integer.")
 
     def select_provided(self, provided_monsters:Optional[ArrayR[type[MonsterBase]]]=None):
+        """
+        Best case: O(n)
+        Worst case: O(n) - Where n is the amount of monsters in the team
+        """
         """
         Generates a team based on a list of already provided monster classes.
 
@@ -201,10 +296,22 @@ class MonsterTeam:
         Example team if in TeamMode.FRONT:
         [Gustwing Instance, Aquariuma Instance, Flamikin Instance]
         """
-        raise NotImplementedError
+        if provided_monsters is None:
+            raise ValueError("Provided monsters list is required.")
+        
+        for monster_class in provided_monsters:
+            self.add_to_team(monster_class())
+
+    def __len__(self) -> int:
+        """
+        O(1): Simplty returns the length of team size
+        """
+        return self.team_size
 
     def choose_action(self, currently_out: MonsterBase, enemy: MonsterBase) -> Battle.Action:
-        # This is just a placeholder function that doesn't matter much for testing.
+        """
+        O(1): Only requires a singular calculation, comparing the values of the current monster against the enemy.
+        """
         from battle import Battle
         if currently_out.get_speed() >= enemy.get_speed() or currently_out.get_hp() >= enemy.get_hp():
             return Battle.Action.ATTACK
